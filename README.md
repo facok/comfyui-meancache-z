@@ -21,6 +21,7 @@ Copy the `comfyui-meancache-z` folder to your ComfyUI `custom_nodes` directory.
 2. Connect it to the **MeanCache (Z-Image)** node
 3. Select a preset or use Custom mode
 4. Connect the patched model output to your sampler
+<img width="1182" height="840" alt="image" src="https://github.com/user-attachments/assets/539c4bfd-5499-43b2-81a1-be58a9eb55fd" />
 
 ### Presets
 
