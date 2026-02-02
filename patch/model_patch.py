@@ -18,7 +18,8 @@ from ..core.velocity_cache import (
     compute_jvp_approximation,
     compute_velocity_similarity,
     compute_online_L_K,
-    should_skip_step
+    should_skip_step,
+    get_optimal_k
 )
 from ..core.trajectory_scheduler import TrajectoryScheduler
 
@@ -42,6 +43,7 @@ def apply_meancache_to_model(
     peak_threshold: float = 0.15,
     gamma: float = 2.0,
     max_cache_span: int = DEFAULT_MAX_CACHE_SPAN,
+    adaptive_k: bool = True,
     debug: bool = False,
     preset_name: str = "Custom",
 ) -> ModelPatcher:
@@ -66,6 +68,7 @@ def apply_meancache_to_model(
         peak_threshold: Maximum allowed single-step deviation for PSSP
         gamma: PSSP penalty exponent (higher = penalize large deviations more)
         max_cache_span: Maximum cache span K for JVP_K computation
+        adaptive_k: Dynamically select K based on sigma (True) or use max K (False)
         debug: Enable debug logging to console
         preset_name: Name of the active preset (for summary display)
 
@@ -104,6 +107,7 @@ def apply_meancache_to_model(
         "cache_device": cache_device_resolved,
         "gamma": gamma,
         "max_cache_span": max_cache_span,
+        "adaptive_k": adaptive_k,
         "preset_name": preset_name,
     }
 
@@ -376,13 +380,27 @@ def _process_single_prediction(
         state.update_history(pred_id, v_current, current_sigma)
 
         # Try to compute JVP using multi-step history (JVP_K)
-        # Prefer larger K for smoother JVP estimate (less noise in extrapolation)
+        # Adaptive K: select optimal K based on sigma (official MeanCache pattern)
+        # Fixed K: use largest available K (original behavior)
         jvp = None
-        for k in range(config["max_cache_span"], 0, -1):
-            jvp_k = state.get_jvp_k(pred_id, k)
-            if jvp_k is not None:
-                jvp = jvp_k
-                break  # Use largest available JVP_K
+        if config.get("adaptive_k", True):
+            # Adaptive: early steps use small K (fast changes), late steps use large K (stable)
+            optimal_k = get_optimal_k(current_sigma, config["max_cache_span"])
+            jvp = state.get_jvp_k(pred_id, optimal_k)
+            # Fallback to smaller K if optimal not available
+            if jvp is None:
+                for k in range(min(optimal_k - 1, config["max_cache_span"]), 0, -1):
+                    jvp_k = state.get_jvp_k(pred_id, k)
+                    if jvp_k is not None:
+                        jvp = jvp_k
+                        break
+        else:
+            # Fixed: try largest K first (original behavior)
+            for k in range(config["max_cache_span"], 0, -1):
+                jvp_k = state.get_jvp_k(pred_id, k)
+                if jvp_k is not None:
+                    jvp = jvp_k
+                    break
 
         # Fall back to simple two-step JVP if history-based JVP not available
         if jvp is None:
@@ -534,13 +552,24 @@ def _process_batch_prediction(
         state.update_history(pred_id, v_current, current_sigma)
 
         # Try to compute JVP using multi-step history
-        # Prefer larger K for smoother JVP estimate
+        # Adaptive K: select optimal K based on sigma (official MeanCache pattern)
+        # Fixed K: use largest available K (original behavior)
         jvp = None
-        for k in range(config["max_cache_span"], 0, -1):
-            jvp_k = state.get_jvp_k(pred_id, k)
-            if jvp_k is not None:
-                jvp = jvp_k
-                break
+        if config.get("adaptive_k", True):
+            optimal_k = get_optimal_k(current_sigma, config["max_cache_span"])
+            jvp = state.get_jvp_k(pred_id, optimal_k)
+            if jvp is None:
+                for k in range(min(optimal_k - 1, config["max_cache_span"]), 0, -1):
+                    jvp_k = state.get_jvp_k(pred_id, k)
+                    if jvp_k is not None:
+                        jvp = jvp_k
+                        break
+        else:
+            for k in range(config["max_cache_span"], 0, -1):
+                jvp_k = state.get_jvp_k(pred_id, k)
+                if jvp_k is not None:
+                    jvp = jvp_k
+                    break
 
         # Fall back to simple two-step JVP
         if jvp is None:

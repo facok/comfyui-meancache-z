@@ -23,6 +23,7 @@ PRESETS = {
         "enable_pssp": True,
         "peak_threshold": 0.08,
         "gamma": 3.0,
+        "adaptive_k": True,
     },
     "Balanced": {
         "rel_l1_thresh": 0.30,
@@ -32,6 +33,7 @@ PRESETS = {
         "enable_pssp": True,
         "peak_threshold": 0.15,
         "gamma": 2.0,
+        "adaptive_k": True,
     },
     "Speed": {
         "rel_l1_thresh": 0.50,
@@ -41,6 +43,7 @@ PRESETS = {
         "enable_pssp": True,
         "peak_threshold": 0.20,
         "gamma": 1.5,
+        "adaptive_k": True,
     },
     "Turbo": {
         "rel_l1_thresh": 0.70,
@@ -50,6 +53,7 @@ PRESETS = {
         "enable_pssp": True,
         "peak_threshold": 0.25,
         "gamma": 1.0,
+        "adaptive_k": True,
     },
 }
 
@@ -174,6 +178,19 @@ class MeanCache_ZImage(io.ComfyNode):
                         "Lower = more conservative, higher = more aggressive."
                     )
                 ),
+                io.Boolean.Input(
+                    "adaptive_k",
+                    default=True,
+                    optional=True,
+                    label_on="Adaptive K Enabled",
+                    label_off="Fixed K Mode",
+                    tooltip=(
+                        "[Custom only] Dynamically select JVP lookback steps K based on sigma. "
+                        "Early steps use small K (captures rapid changes), "
+                        "later steps use large K (smoother estimates). "
+                        "Based on official MeanCache edge_order patterns."
+                    )
+                ),
                 io.Combo.Input(
                     "cache_device",
                     options=["cpu", "cuda"],
@@ -215,6 +232,7 @@ class MeanCache_ZImage(io.ComfyNode):
         end_step: int = -1,
         enable_pssp: bool = True,
         peak_threshold: float = 0.15,
+        adaptive_k: bool = True,
         cache_device: str = "cpu",
         debug: bool = False,
     ) -> io.NodeOutput:
@@ -231,6 +249,7 @@ class MeanCache_ZImage(io.ComfyNode):
             enable_pssp = params["enable_pssp"]
             peak_threshold = params["peak_threshold"]
             gamma = params["gamma"]
+            adaptive_k = params["adaptive_k"]
         else:
             # Custom mode: use manual parameter values
             gamma = 2.0
@@ -245,6 +264,7 @@ class MeanCache_ZImage(io.ComfyNode):
             enable_pssp=enable_pssp,
             peak_threshold=peak_threshold,
             gamma=gamma,
+            adaptive_k=adaptive_k,
             debug=debug,
             preset_name=preset,
         )

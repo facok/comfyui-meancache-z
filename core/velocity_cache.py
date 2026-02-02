@@ -15,6 +15,32 @@ import torch
 from typing import Tuple, Optional
 
 
+def get_optimal_k(sigma: float, max_k: int = 5) -> int:
+    """
+    根据 sigma 值动态选择最优 JVP 回溯步数 K。
+
+    基于官方 MeanCache edge_order 模式分析:
+    - 早中期 (sigma > 0.5): 速度变化快，短回溯更准确
+    - 中期 (sigma 0.2-0.5): 适度平滑
+    - 后期 (sigma < 0.2): 速度稳定，长回溯更平滑
+
+    Args:
+        sigma: 当前 sigma 值 (噪声水平)
+        max_k: 最大允许的 K 值
+
+    Returns:
+        最优 K 值
+    """
+    if sigma > 0.5:
+        return 1  # 早中期: 速度变化快，短回溯
+    elif sigma > 0.2:
+        return min(max_k, 2)  # 中期: 适度平滑
+    elif sigma > 0.1:
+        return min(max_k, 3)  # 中后期: 较长回溯
+    else:
+        return max_k  # 后期: 最大平滑
+
+
 def compute_jvp_approximation(
     v_current: torch.Tensor,
     v_prev: torch.Tensor,
