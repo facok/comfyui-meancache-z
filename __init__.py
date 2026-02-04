@@ -24,7 +24,7 @@ License : MIT
     - Training-free: No model fine-tuning required
     - JVP-based velocity correction for accurate ODE trajectory
     - PSSP (Peak-Suppressed Shortest Path) scheduling for optimal compute allocation
-    - 3.5-4.5x inference speedup while maintaining image quality
+    - ~1.3-2.0x inference speedup while maintaining image quality
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 """
 

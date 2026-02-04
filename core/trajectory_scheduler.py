@@ -40,8 +40,8 @@ class TrajectoryScheduler:
         gamma: float = 2.0,
         peak_threshold: float = 0.15,
         min_compute_steps: int = 4,
-        critical_start_ratio: float = 0.20,
-        critical_end_ratio: float = 0.80
+        critical_start_ratio: float = None,
+        critical_end_ratio: float = None
     ):
         """
         Initialize the trajectory scheduler.
@@ -56,12 +56,21 @@ class TrajectoryScheduler:
             critical_end_ratio: Fraction where late critical zone begins (default 80%)
         """
         self.total_steps = max(1, total_steps)
-        self.skip_budget = max(0.0, min(0.5, skip_budget))
+        self.skip_budget = max(0.0, min(0.75, skip_budget))
         self.gamma = gamma
         self.peak_threshold = peak_threshold
         self.min_compute_steps = min_compute_steps
-        self.critical_start_ratio = critical_start_ratio
-        self.critical_end_ratio = critical_end_ratio
+        # Adjust critical zone based on skip budget: higher budget = smaller protected zones
+        if critical_start_ratio is None:
+            # Quality (0.2) -> Turbo (0.05)
+            self.critical_start_ratio = max(0.05, 0.20 - self.skip_budget * 0.25)
+        else:
+            self.critical_start_ratio = critical_start_ratio
+        if critical_end_ratio is None:
+            # Quality (0.8) -> Turbo (0.95)
+            self.critical_end_ratio = min(0.95, 0.80 + self.skip_budget * 0.20)
+        else:
+            self.critical_end_ratio = critical_end_ratio
 
         # Will be computed when deviation estimates are available
         self.skip_mask: List[bool] = [False] * total_steps
@@ -99,7 +108,8 @@ class TrajectoryScheduler:
             return
 
         # Calculate minimum spacing between skips
-        min_spacing = max(2, len(skip_candidates) // (max_skips + 1))
+        # Allow spacing of 1 for high skip budgets to achieve aggressive skipping
+        min_spacing = max(1, len(skip_candidates) // (max_skips + 1))
 
         # Assign skips with even spacing
         skips_assigned = 0
@@ -281,7 +291,8 @@ class TrajectoryScheduler:
             return False, 0.0
 
         # Override: don't skip if too much error accumulated
-        max_accumulated = 0.5
+        # Scale max_accumulated based on skip_budget to allow higher skipping for aggressive modes
+        max_accumulated = 0.5 + self.skip_budget * 0.5  # 0.5 -> 0.875 for high budgets
         if scheduled_skip and accumulated_error > max_accumulated * 0.8:
             return False, 0.0
 

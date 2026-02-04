@@ -6,7 +6,7 @@ Based on UnicomAI MeanCache research:
 https://unicomai.github.io/MeanCache/
 
 This node patches Z-Image models to use average velocity (via JVP approximation)
-instead of instantaneous velocity, enabling 3.5-4.5x speedup while maintaining quality.
+instead of instantaneous velocity, enabling ~1.3-2.0x speedup while maintaining quality.
 """
 from comfy_api.latest import io
 from ..patch.model_patch import apply_meancache_to_model
@@ -14,10 +14,11 @@ from ..patch.model_patch import apply_meancache_to_model
 
 # Preset acceleration profiles
 # Each preset defines a tuned parameter set for different speed/quality tradeoffs.
+# Tuned to match official MeanCache acceleration ratios.
 PRESETS = {
     "Quality": {
         "rel_l1_thresh": 0.15,
-        "skip_budget": 0.15,
+        "skip_budget": 0.20,  # ~1.25x speedup, conservative
         "start_step": 3,
         "end_step": -1,
         "enable_pssp": True,
@@ -27,7 +28,7 @@ PRESETS = {
     },
     "Balanced": {
         "rel_l1_thresh": 0.30,
-        "skip_budget": 0.30,
+        "skip_budget": 0.40,  # ~1.67x speedup, matches official 30-step
         "start_step": 2,
         "end_step": -1,
         "enable_pssp": True,
@@ -37,21 +38,21 @@ PRESETS = {
     },
     "Speed": {
         "rel_l1_thresh": 0.50,
-        "skip_budget": 0.40,
+        "skip_budget": 0.55,  # ~2.2x speedup, matches official 22-step
         "start_step": 1,
         "end_step": -1,
         "enable_pssp": True,
-        "peak_threshold": 0.20,
+        "peak_threshold": 0.35,
         "gamma": 1.5,
         "adaptive_k": True,
     },
     "Turbo": {
-        "rel_l1_thresh": 0.70,
-        "skip_budget": 0.50,
+        "rel_l1_thresh": 0.55,
+        "skip_budget": 0.60,  # ~2.5x speedup, aggressive but usable
         "start_step": 1,
         "end_step": -1,
         "enable_pssp": True,
-        "peak_threshold": 0.25,
+        "peak_threshold": 0.45,
         "gamma": 1.0,
         "adaptive_k": True,
     },
@@ -97,9 +98,9 @@ class MeanCache_ZImage(io.ComfyNode):
                     default="Balanced",
                     tooltip=(
                         "Acceleration preset. "
-                        "Quality (~1.4x): conservative, minimal skipping. "
-                        "Balanced (~1.7x): good speed/quality tradeoff. "
-                        "Speed (~1.8x): aggressive skipping. "
+                        "Quality (~1.3x): conservative, minimal skipping. "
+                        "Balanced (~1.5x): good speed/quality tradeoff. "
+                        "Speed (~1.75x): aggressive skipping. "
                         "Turbo (~2.0x): maximum speed, may reduce quality. "
                         "Custom: use manual parameters below."
                     )
@@ -122,7 +123,7 @@ class MeanCache_ZImage(io.ComfyNode):
                     "skip_budget",
                     default=0.3,
                     min=0.0,
-                    max=0.5,
+                    max=0.75,
                     step=0.05,
                     optional=True,
                     tooltip=(
@@ -170,7 +171,7 @@ class MeanCache_ZImage(io.ComfyNode):
                     "peak_threshold",
                     default=0.15,
                     min=0.05,
-                    max=0.3,
+                    max=0.60,
                     step=0.01,
                     optional=True,
                     tooltip=(

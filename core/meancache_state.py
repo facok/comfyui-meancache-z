@@ -38,6 +38,7 @@ class MeanCacheState:
         self._next_pred_id: int = 0
         self.last_sigma: Optional[float] = None  # For split CFG detection
         self.split_cfg_unified_error: Optional[float] = None  # Unified error for consistent CFG decisions
+        self.scheduler: Optional[Any] = None  # PSSP scheduler for skip decisions
 
     def new_prediction(self, cache_device: Optional[str] = None) -> int:
         """
@@ -233,6 +234,7 @@ class MeanCacheState:
         self._next_pred_id = 0
         self.last_sigma = None
         self.split_cfg_unified_error = None
+        self.scheduler = None
 
     def increment_step(self, pred_id: int) -> None:
         """

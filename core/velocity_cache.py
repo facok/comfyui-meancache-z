@@ -208,6 +208,7 @@ def compute_online_L_K(
         Relative prediction error (lower = better JVP accuracy, safer to skip)
     """
     # JVP-corrected prediction: what we expected v_new to be
+    # NOTE: dt_elapsed is positive, but JVP correction requires addition
     predicted_v = v_cached.to(v_new.device) + dt_elapsed * jvp_cached.to(v_new.device)
 
     # Relative prediction error

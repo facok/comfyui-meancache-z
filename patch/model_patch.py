@@ -156,7 +156,8 @@ def apply_meancache_to_model(
         total_steps = len(sigmas) - 1 if sigmas is not None else 20
 
         # Get or create scheduler for PSSP
-        scheduler = transformer_options.get("meancache_scheduler")
+        # Store scheduler in meancache_state to persist across steps
+        scheduler = meancache_state.scheduler
         if scheduler is None and config["enable_pssp"]:
             scheduler = TrajectoryScheduler(
                 total_steps=total_steps,
@@ -167,6 +168,7 @@ def apply_meancache_to_model(
             # Adjust schedule based on actual sigma values if available
             if sigmas is not None:
                 scheduler.adjust_for_sigmas(sigmas)
+            meancache_state.scheduler = scheduler
 
         # Process the batch - handle CFG (conditional/unconditional)
         batch_size = input_x.shape[0]
@@ -359,7 +361,9 @@ def _process_single_prediction(
 
         if jvp_cache is not None:
             # Apply JVP correction: estimate current velocity from cached data
-            dt = sigma_cache - current_sigma  # sigma decreases, so this is positive
+            # NOTE: dt is positive (sigma_cache > current_sigma), but JVP formula requires
+            # addition because the correction direction matches velocity evolution
+            dt = sigma_cache - current_sigma
             jvp_device = jvp_cache.to(input_x.device)
             output = v_cache + dt * jvp_device
             _debug_log(f"  pred_id={pred_id}: SKIP+JVP (dt={dt:.4f}, deviation={accumulated_error:.4f})")
@@ -369,6 +373,10 @@ def _process_single_prediction(
             _debug_log(f"  pred_id={pred_id}: SKIP (no JVP, deviation={accumulated_error:.4f})")
 
         state.record_skip(pred_id, step_index)
+
+        # Update history with estimated velocity (matches official implementation behavior)
+        # This ensures v_history grows even during skips for accurate JVP_K computation
+        state.update_history(pred_id, output.detach(), current_sigma)
     else:
         # COMPUTE: Full model forward pass
         output = model_function(input_x, timestep, **c)
@@ -526,6 +534,7 @@ def _process_batch_prediction(
 
             if jvp_cache is not None:
                 # Apply JVP correction
+                # NOTE: dt is positive, but JVP formula requires addition
                 dt = sigma_cache - current_sigma
                 jvp_device = jvp_cache.to(input_x.device)
                 v_corrected = v_cache + dt * jvp_device
@@ -535,6 +544,11 @@ def _process_batch_prediction(
 
             state.record_skip(pred_id, step_index)
             state.increment_step(pred_id)
+
+        # Update history with estimated velocities for all skipped predictions
+        for pred_id in range(batch_size):
+            v_estimated = outputs[pred_id]
+            state.update_history(pred_id, v_estimated.detach(), current_sigma)
 
         return torch.cat(outputs, dim=0)
 

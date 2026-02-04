@@ -1,11 +1,12 @@
 import { app } from "../../../scripts/app.js";
 
 // Preset parameter values (must mirror Python PRESETS in meancache_node.py)
+// Tuned to match official MeanCache acceleration ratios.
 const PRESETS = {
-    "Quality":  { rel_l1_thresh: 0.15, skip_budget: 0.15, start_step: 3, end_step: -1, enable_pssp: true, peak_threshold: 0.08, adaptive_k: true },
-    "Balanced": { rel_l1_thresh: 0.30, skip_budget: 0.30, start_step: 2, end_step: -1, enable_pssp: true, peak_threshold: 0.15, adaptive_k: true },
-    "Speed":    { rel_l1_thresh: 0.50, skip_budget: 0.40, start_step: 1, end_step: -1, enable_pssp: true, peak_threshold: 0.20, adaptive_k: true },
-    "Turbo":    { rel_l1_thresh: 0.70, skip_budget: 0.50, start_step: 1, end_step: -1, enable_pssp: true, peak_threshold: 0.25, adaptive_k: true },
+    "Quality":  { rel_l1_thresh: 0.15, skip_budget: 0.20, start_step: 3, end_step: -1, enable_pssp: true, peak_threshold: 0.08, adaptive_k: true },
+    "Balanced": { rel_l1_thresh: 0.30, skip_budget: 0.40, start_step: 2, end_step: -1, enable_pssp: true, peak_threshold: 0.15, adaptive_k: true },
+    "Speed":    { rel_l1_thresh: 0.50, skip_budget: 0.55, start_step: 1, end_step: -1, enable_pssp: true, peak_threshold: 0.35, adaptive_k: true },
+    "Turbo":    { rel_l1_thresh: 0.55, skip_budget: 0.60, start_step: 1, end_step: -1, enable_pssp: true, peak_threshold: 0.45, adaptive_k: true },
 };
 
 // Widget names controlled by preset selection

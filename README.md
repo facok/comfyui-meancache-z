@@ -27,9 +27,9 @@ Copy the `comfyui-meancache-z` folder to your ComfyUI `custom_nodes` directory.
 
 | Preset | Speedup | Description |
 |--------|---------|-------------|
-| Quality | ~1.4x | Conservative, minimal skipping, best quality |
+| Quality | ~1.25x | Conservative, minimal skipping, best quality |
 | Balanced | ~1.7x | Good speed/quality tradeoff (default) |
-| Speed | ~1.8x | Aggressive skipping |
+| Speed | ~1.75x | Aggressive skipping |
 | Turbo | ~2.0x | Maximum speed, may reduce quality |
 | Custom | - | Manual parameter control |
 
@@ -37,23 +37,24 @@ Copy the `comfyui-meancache-z` folder to your ComfyUI `custom_nodes` directory.
 
 | Preset | rel_l1_thresh | skip_budget | start_step | peak_threshold | gamma |
 |--------|---------------|-------------|------------|----------------|-------|
-| Quality | 0.15 | 0.15 | 3 | 0.08 | 3.0 |
-| Balanced | 0.30 | 0.30 | 2 | 0.15 | 2.0 |
-| Speed | 0.50 | 0.40 | 1 | 0.20 | 1.5 |
-| Turbo | 0.70 | 0.50 | 1 | 0.25 | 1.0 |
+| Quality | 0.15 | 0.20 | 3 | 0.08 | 3.0 |
+| Balanced | 0.30 | 0.40 | 2 | 0.15 | 2.0 |
+| Speed | 0.50 | 0.55 | 1 | 0.35 | 1.5 |
+| Turbo | 0.55 | 0.60 | 1 | 0.45 | 1.0 |
 
 ### Custom Mode Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| rel_l1_thresh | 0.3 | Skip threshold (lower=quality, higher=speed) |
-| skip_budget | 0.3 | Max fraction of steps to skip (0-0.5) |
-| start_step | 2 | Step to begin caching (protect early structure) |
-| end_step | -1 | Step to end caching (-1=until end) |
-| enable_pssp | True | Enable PSSP trajectory scheduling |
-| peak_threshold | 0.15 | Max single-step deviation |
-| cache_device | cpu | Device for velocity cache (cpu/cuda) |
-| debug | False | Enable debug logging |
+| Parameter | Default | Range | Description |
+|-----------|---------|-------|-------------|
+| rel_l1_thresh | 0.3 | 0.05-0.70 | Skip threshold (lower=quality, higher=speed) |
+| skip_budget | 0.3 | 0.0-0.75 | Max fraction of steps to skip |
+| start_step | 2 | 0-20 | Step to begin caching (protect early structure) |
+| end_step | -1 | -1 or 0+ | Step to end caching (-1=until end) |
+| enable_pssp | True | - | Enable PSSP trajectory scheduling |
+| peak_threshold | 0.15 | 0.05-0.60 | Max single-step velocity deviation |
+| gamma | 2.0 | 0.5-3.0 | PSSP peak suppression exponent |
+| cache_device | cpu | cpu/cuda | Device for velocity cache |
+| debug | False | - | Enable debug logging |
 
 ## Sampling Summary
 
