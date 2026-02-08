@@ -9,6 +9,7 @@ Reference implementations:
 - TeaCache: ComfyUI-WanVideoWrapper/cache_methods/cache_methods.py
 """
 import torch
+import hashlib
 from typing import Dict, Any, Callable, Optional
 from comfy.model_patcher import ModelPatcher
 from comfy import model_management as mm
@@ -30,6 +31,52 @@ def _debug_log(msg: str):
     """Print debug message if debug mode is enabled."""
     if MEANCACHE_DEBUG:
         print(f"[MeanCache] {msg}")
+
+
+def _get_lora_fingerprint(model_patcher: ModelPatcher) -> str:
+    """
+    Generate a fingerprint for model patch state (including LoRA) to detect changes.
+
+    When LoRA is applied/removed/changed, the model's patches dict changes,
+    making cached velocities invalid. This function creates a fingerprint
+    based on the actual applied patches, which is more reliable than
+    checking model_options (which may not contain LoRA metadata).
+
+    Args:
+        model_patcher: The ComfyUI ModelPatcher instance
+
+    Returns:
+        String fingerprint of patch state ("no_patches" if none applied)
+    """
+    try:
+        # Get the actual patches dict from ModelPatcher
+        # This contains all applied weight patches including LoRA
+        patches = getattr(model_patcher, 'patches', None)
+        if not patches:
+            return "no_patches"
+
+        # Create fingerprint from patch keys and strengths
+        # Format: hash of "key1:strength1|key2:strength2|..."
+        patch_info = []
+        for key in sorted(patches.keys()):
+            patch_data = patches[key]
+            # patch_data is typically (strength, (lora_key, weight, ...))
+            if isinstance(patch_data, tuple) and len(patch_data) >= 1:
+                strength = patch_data[0]
+                patch_info.append(f"{key}:{strength:.6f}")
+            else:
+                patch_info.append(str(key))
+
+        if not patch_info:
+            return "no_patches"
+
+        # Use hash for compact fingerprint
+        fingerprint_str = "|".join(patch_info)
+        return hashlib.md5(fingerprint_str.encode()).hexdigest()[:16]
+    except Exception:
+        # Fallback: if we can't read patches, return a safe default
+        # that won't cause unnecessary resets
+        return "unknown"
 
 
 def apply_meancache_to_model(
@@ -173,6 +220,17 @@ def apply_meancache_to_model(
         # Process the batch - handle CFG (conditional/unconditional)
         batch_size = input_x.shape[0]
 
+        # Detect patch state changes (including LoRA) - if patches change,
+        # cached velocities are invalid for different model weights
+        current_patch_key = _get_lora_fingerprint(m)
+        last_patch_key = getattr(meancache_state, '_last_patch_key', None)
+        if last_patch_key is not None and current_patch_key != last_patch_key:
+            _debug_log(f"Model patches changed, resetting MeanCache state")
+            state.clear_all()
+            meancache_state.scheduler = None
+            meancache_state._summary_printed = False
+        meancache_state._last_patch_key = current_patch_key
+
         # Detect new sampling run by sigma jump (handles ComfyUI model caching)
         # During sampling, sigma decreases monotonically. A jump UP means new run started.
         last_sigma = meancache_state.last_sigma
@@ -180,6 +238,7 @@ def apply_meancache_to_model(
             _debug_log(f"New sampling run detected (sigma jump {last_sigma:.4f} → {current_sigma:.4f}), resetting state")
             state.clear_all()
             meancache_state.last_sigma = None
+            meancache_state._last_patch_key = None  # Force re-detection of patches for new run
             meancache_state._summary_printed = False
             last_sigma = None  # Update local variable too
 

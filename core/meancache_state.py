@@ -235,6 +235,8 @@ class MeanCacheState:
         self.last_sigma = None
         self.split_cfg_unified_error = None
         self.scheduler = None
+        self._last_patch_key = None
+        self._summary_printed = False
 
     def increment_step(self, pred_id: int) -> None:
         """
